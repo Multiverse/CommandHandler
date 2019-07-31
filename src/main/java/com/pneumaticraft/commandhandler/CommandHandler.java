@@ -273,6 +273,23 @@ public class CommandHandler {
         return null;
     }
 
+    /**
+     * Returns whether or not the given flag is present in t he given args
+     *
+     * @param flag A param flag to check for
+     * @param args All arguments to search through
+     *
+     * @return True if the flag is present in the args
+     */
+    public static boolean hasFlag(String flag, List<String> args) {
+        for (String s : args) {
+            if (s.equalsIgnoreCase(flag)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void checkAndRunCommand(CommandSender sender, List<String> parsedArgs, Command foundCommand, boolean notifySender) {
         if (this.permissions.hasAnyPermission(sender, foundCommand.getAllPermissionStrings(), foundCommand.isOpRequired())) {
             if (foundCommand.checkArgLength(parsedArgs)) {
