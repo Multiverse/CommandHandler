@@ -3,6 +3,7 @@ package com.pneumaticraft.commandhandler;
 import com.lithium3141.shellparser.ShellParser;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.io.FileNotFoundException;
@@ -10,9 +11,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Iterator;
+import java.util.ListIterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 public class CommandHandler {
 
@@ -72,7 +75,7 @@ public class CommandHandler {
     }
 
     public boolean locateAndRunCommand(CommandSender sender, List<String> args, boolean notifySender) {
-        List<String> parsedArgs = parseAllQuotedStrings(args);
+        List<String> parsedArgs = parseSelectors(sender, parseAllQuotedStrings(args));
         CommandKey key = null;
 
         Iterator<Command> iterator = this.allCommands.iterator();
@@ -173,6 +176,68 @@ public class CommandHandler {
         } else {
             return result;
         }
+    }
+
+    /**
+     * Parse vanilla selectors. See https://minecraft.gamepedia.com/Commands#Target_selectors about it.
+     *
+     * @param sender  Object that executed the command
+     * @param args    Command arguments
+     * @return Arguments list with selectors parsed to playerName if any.
+     */
+    public List<String> parseSelectors(CommandSender sender, List<String> args) {
+        if (sender == null || args == null) {
+            throw new IllegalArgumentException("sender and args cannot be null!");
+        }
+
+        for (ListIterator<String> argsIterator = args.listIterator(); argsIterator.hasNext(); ) {
+            String arg = argsIterator.next();
+            String parsedArg = parseSingleSelector(sender, arg);
+            if (parsedArg.equals(arg)) {
+                continue;
+            }
+            argsIterator.set(parsedArg);
+        }
+
+        return args;
+    }
+
+    /**
+     * Parse a vanilla selector. See https://minecraft.gamepedia.com/Commands#Target_selectors about it.
+     *
+     * @param sender  Object that executed the command
+     * @param arg    A single command argument
+     * @return Arguments list with selectors parsed to playerName if any.
+     */
+    public String parseSingleSelector(CommandSender sender, String arg) {
+        if (sender == null || arg == null) {
+            throw new IllegalArgumentException("sender and arg cannot be null!");
+        }
+        if (!arg.startsWith("@")) {
+            return arg;
+        }
+
+        List<Player> matchedPlayers;
+        try {
+            matchedPlayers = this.plugin.getServer().selectEntities(sender, arg).stream()
+                    .filter(e -> e instanceof Player)
+                    .map(e -> ((Player) e))
+                    .collect(Collectors.toList());
+        } catch (IllegalArgumentException e) {
+            plugin.getLogger().log(Level.WARNING, "Error parsing selector '" + arg + "' for " + sender);
+            e.printStackTrace();
+            return arg;
+        }
+        if (matchedPlayers.isEmpty()) {
+            return arg;
+        }
+        if (matchedPlayers.size() > 1) {
+            this.plugin.getLogger().log(Level.WARNING, "Error parsing selector '" + arg + "' for " + sender +
+                    ": ambiguous result (more than one player matched) - " + matchedPlayers);
+            return arg;
+        }
+
+        return matchedPlayers.get(0).getName();
     }
 
     /**
